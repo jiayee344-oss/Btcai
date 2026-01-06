@@ -1,0 +1,2347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTC/USDT 自动交易信号系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 自定义样式 */
+        .signal-buy {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(6, 78, 59, 0.1));
+            border-left: 4px solid #10b981;
+            border: 2px solid #10b981;
+        }
+        .signal-sell {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(127, 29, 29, 0.1));
+            border-left: 4px solid #ef4444;
+            border: 2px solid #ef4444;
+        }
+        .signal-hold {
+            background: linear-gradient(135deg, rgba(156, 163, 175, 0.15), rgba(55, 65, 81, 0.1));
+            border-left: 4px solid #9ca3af;
+            border: 2px solid #9ca3af;
+        }
+        .price-hit {
+            animation: pulse 1.5s infinite;
+        }
+        .blink {
+            animation: blink 1s infinite;
+        }
+        .progress-bar {
+            transition: width 0.5s ease;
+        }
+        .ai-thinking {
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #10b981);
+            background-size: 200% 200%;
+            animation: gradient 2s ease infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+    <div class="container mx-auto p-4 max-w-6xl">
+        <!-- 头部 -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-yellow-500 mb-2">
+                <i class="fas fa-robot mr-2"></i>BTC/USDT 自动交易信号系统
+            </h1>
+            <p class="text-gray-400">全自动运行 | 基于OKX交易所实时数据 | 所有访问者信号一致</p>
+        </div>
+
+        <!-- 系统状态栏 -->
+        <div class="mb-6 p-4 bg-gray-800 rounded-lg border border-gray-700">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div>
+                    <div class="text-gray-400 text-sm">系统状态</div>
+                    <div id="systemStatus" class="text-green-400">
+                        <i class="fas fa-circle mr-1"></i>初始化中...
+                    </div>
+                </div>
+                <div>
+                    <div class="text-gray-400 text-sm">数据源</div>
+                    <div class="text-yellow-400 text-sm">OKX交易所</div>
+                </div>
+                <div>
+                    <div class="text-gray-400 text-sm">交易模式</div>
+                    <div class="text-blue-400 text-sm">全自动</div>
+                </div>
+                <div>
+                    <div class="text-gray-400 text-sm">信号同步</div>
+                    <div class="text-green-400 text-sm">已启用</div>
+                </div>
+                <div>
+                    <div class="text-gray-400 text-sm">版本</div>
+                    <div class="text-purple-400 text-sm">v2.1</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主要内容区域 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- 左侧：实时价格 -->
+            <div class="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold">
+                        <i class="fas fa-chart-line text-blue-400 mr-2"></i>实时市场数据
+                    </h2>
+                    <span id="marketStatus" class="px-3 py-1 text-xs rounded-full bg-green-900 text-green-300">
+                        <i class="fas fa-circle animate-pulse mr-1"></i>实时更新
+                    </span>
+                </div>
+                <div class="text-center py-4">
+                    <div id="priceDisplay" class="text-5xl font-bold text-green-400 mb-2">$--</div>
+                    <div class="text-gray-400 mb-1">BTC/USDT</div>
+                    <div id="updateTime" class="text-sm text-gray-500">--:--:--</div>
+                    <div class="mt-4 grid grid-cols-2 gap-3">
+                        <div class="text-center p-3 bg-gray-900 rounded">
+                            <div class="text-gray-400 text-sm">24H高</div>
+                            <div id="high24h" class="text-green-400 font-bold text-lg">$--</div>
+                        </div>
+                        <div class="text-center p-3 bg-gray-900 rounded">
+                            <div class="text-gray-400 text-sm">24H低</div>
+                            <div id="low24h" class="text-red-400 font-bold text-lg">$--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 中间：AI信号 -->
+            <div id="signalCard" class="signal-hold rounded-xl p-6 shadow-lg">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold">
+                        <i class="fas fa-robot text-purple-400 mr-2"></i>AI交易信号
+                    </h2>
+                    <div id="signalStatus" class="px-3 py-1 text-xs rounded-full bg-purple-900 text-purple-300">
+                        <i class="fas fa-cog fa-spin mr-1"></i>分析中...
+                    </div>
+                </div>
+                
+                <div id="aiAnalysis" class="mb-4 p-3 bg-gray-900/50 rounded-lg border border-gray-700">
+                    <div class="flex items-center text-gray-400 text-sm mb-2">
+                        <i class="fas fa-brain mr-2"></i>
+                        <span>AI分析过程:</span>
+                    </div>
+                    <div id="analysisText" class="text-sm text-gray-300">
+                        正在分析市场数据，计算技术指标...
+                    </div>
+                </div>
+                
+                <div class="text-center py-2">
+                    <div id="signalAction" class="text-5xl font-bold mb-4">--</div>
+                    <div class="text-2xl text-gray-300 mb-1">
+                        置信度: <span id="signalConfidence" class="text-yellow-400">--%</span>
+                    </div>
+                    <div id="signalTime" class="text-sm text-gray-500">--:--:--</div>
+                </div>
+            </div>
+
+            <!-- 右侧：交易参数 -->
+            <div class="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
+                <h2 class="text-xl font-semibold mb-6">
+                    <i class="fas fa-calculator text-red-400 mr-2"></i>交易参数计算
+                </h2>
+                
+                <div class="space-y-5">
+                    <div class="p-3 bg-gray-900 rounded-lg">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-gray-400">入场价格 (Entry)</span>
+                            <span id="entryPrice" class="text-2xl font-bold text-white">$--</span>
+                        </div>
+                        <div class="text-xs text-gray-500">当前市场价格</div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="p-3 bg-green-900/30 rounded-lg border border-green-800">
+                            <div class="text-green-400 font-semibold mb-1">止盈目标 (TP)</div>
+                            <div id="takeProfit1" class="text-xl font-bold price-tp1">$--</div>
+                            <div id="takeProfit2" class="text-lg text-green-300 price-tp2">$--</div>
+                            <div class="text-xs text-gray-400 mt-1">风险回报比: <span id="riskReward">--</span></div>
+                        </div>
+                        
+                        <div class="p-3 bg-red-900/30 rounded-lg border border-red-800">
+                            <div class="text-red-400 font-semibold mb-1">止损价格 (SL)</div>
+                            <div id="stopLoss" class="text-xl font-bold price-sl">$--</div>
+                            <div class="text-xs text-red-300 mt-1">保护本金</div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-3 bg-blue-900/20 rounded-lg border border-blue-800">
+                        <div class="text-blue-400 font-semibold mb-1">建议仓位 (100USDT本金)</div>
+                        <div class="flex items-end justify-between">
+                            <div>
+                                <div id="positionSize" class="text-2xl font-bold">-- USDT</div>
+                                <div class="text-xs text-gray-400 mt-1">每次交易金额</div>
+                            </div>
+                            <div class="text-right">
+                                <div id="positionPercent" class="text-lg">--%</div>
+                                <div class="text-xs text-gray-400">账户占比</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-3 bg-yellow-900/20 rounded-lg border border-yellow-800">
+                        <div class="text-yellow-400 text-sm">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            策略参数: TP1:+1.5% | TP2:+3% | SL:-1.2% | 风险:2%
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第二行：监控和图表 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- 价格监控 -->
+            <div class="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
+                <h2 class="text-xl font-semibold mb-4">
+                    <i class="fas fa-bullseye text-yellow-400 mr-2"></i>价格目标监控
+                </h2>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-3 gap-2 mb-6">
+                        <div class="text-center p-3 bg-gray-900 rounded">
+                            <div class="text-gray-400 text-sm">当前价格</div>
+                            <div id="monitorCurrent" class="text-xl font-bold text-white">$--</div>
+                        </div>
+                        <div class="text-center p-3 bg-green-900/30 rounded">
+                            <div class="text-green-400 text-sm">TP1距离</div>
+                            <div id="distanceTP1" class="text-xl font-bold">--%</div>
+                        </div>
+                        <div class="text-center p-3 bg-red-900/30 rounded">
+                            <div class="text-red-400 text-sm">SL距离</div>
+                            <div id="distanceSL" class="text-xl font-bold">--%</div>
+                        </div>
+                    </div>
+                    
+                    <div class="relative h-6 bg-gray-700 rounded-full overflow-hidden mb-2">
+                        <div id="priceProgress" class="absolute h-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 progress-bar"></div>
+                        <div class="absolute top-0 left-0 right-0 h-full flex justify-between px-2">
+                            <div class="h-full w-px bg-red-800"></div>
+                            <div class="h-full w-px bg-yellow-800"></div>
+                            <div class="h-full w-px bg-green-800"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between text-xs text-gray-400 px-1">
+                        <div>SL</div>
+                        <div>入场价</div>
+                        <div>TP1</div>
+                        <div>TP2</div>
+                    </div>
+                    
+                    <div class="mt-6">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="text-gray-400">交易状态:</div>
+                            <div id="tradeStatus" class="px-3 py-1 rounded-full bg-gray-700 text-gray-300">
+                                <i class="fas fa-clock mr-1"></i>等待信号
+                            </div>
+                        </div>
+                        <div id="statusMessage" class="text-sm text-gray-400">
+                            系统初始化中，请稍候...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 图表 -->
+            <div class="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">
+                        <i class="fas fa-chart-bar text-blue-400 mr-2"></i>BTC/USDT 5分钟图表
+                    </h2>
+                    <div class="flex items-center space-x-2">
+                        <select id="timeframeSelect" class="bg-gray-700 border border-gray-600 rounded px-3 py-1 text-sm">
+                            <option value="5m">5分钟</option>
+                            <option value="15m" selected>15分钟</option>
+                            <option value="1H">1小时</option>
+                        </select>
+                        <button onclick="loadChartData()" class="px-3 py-1 bg-gray-700 rounded text-sm hover:bg-gray-600">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="h-72">
+                    <canvas id="priceChart"></canvas>
+                </div>
+                <div class="mt-4 text-center text-gray-500 text-sm">
+                    实时价格走势 | AI分析标记点
+                </div>
+            </div>
+        </div>
+
+        <!-- 第三行：AI分析和控制 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- AI分析详情 -->
+            <div class="lg:col-span-2 bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
+                <h2 class="text-xl font-semibold mb-4">
+                    <i class="fas fa-microscope text-cyan-400 mr-2"></i>AI分析详情
+                </h2>
+                
+                <div class="space-y-4">
+                    <div class="grid grid-cols-3 gap-4 mb-6">
+                        <div class="p-4 bg-gray-900 rounded-lg text-center">
+                            <div class="text-cyan-400 text-sm mb-1">RSI指数</div>
+                            <div id="aiRsi" class="text-2xl font-bold">--</div>
+                            <div id="rsiSignal" class="text-xs mt-1">--</div>
+                        </div>
+                        <div class="p-4 bg-gray-900 rounded-lg text-center">
+                            <div class="text-purple-400 text-sm mb-1">趋势强度</div>
+                            <div id="trendStrength" class="text-2xl font-bold">--%</div>
+                            <div class="text-xs text-gray-400 mt-1">市场方向</div>
+                        </div>
+                        <div class="p-4 bg-gray-900 rounded-lg text-center">
+                            <div class="text-green-400 text-sm mb-1">支撑/阻力</div>
+                            <div id="srLevel" class="text-xl font-bold">--%</div>
+                            <div class="text-xs text-gray-400 mt-1">价格位置</div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 bg-gray-900 rounded-lg">
+                        <div class="text-yellow-400 font-semibold mb-2">
+                            <i class="fas fa-lightbulb mr-2"></i>AI决策逻辑
+                        </div>
+                        <div id="decisionLogic" class="text-sm text-gray-300">
+                            正在分析市场数据，计算多时间框架指标...
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 bg-gray-900 rounded-lg">
+                        <div class="text-green-400 font-semibold mb-2">
+                            <i class="fas fa-chart-pie mr-2"></i>风险评估
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <div class="text-gray-400 text-sm">预期收益率</div>
+                                <div id="expectedReturn" class="text-lg">1.5-3%</div>
+                            </div>
+                            <div>
+                                <div class="text-gray-400 text-sm">最大风险</div>
+                                <div id="maxRisk" class="text-lg">-1.2%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 信号状态控制 -->
+            <div class="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
+                <h2 class="text-xl font-semibold mb-4">
+                    <i class="fas fa-history text-orange-400 mr-2"></i>信号状态控制
+                </h2>
+                
+                <div class="space-y-4">
+                    <div class="p-4 bg-gray-900 rounded-lg">
+                        <div class="text-gray-400 text-sm mb-2">下一个信号条件</div>
+                        <div class="text-sm text-green-300 mb-1">
+                            <i class="fas fa-check-circle mr-1"></i>
+                            当前信号TP/SL触发后生成
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            防止信号重叠，提高交易质量
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 bg-gray-900 rounded-lg">
+                        <div class="flex justify-between items-center mb-3">
+                            <div class="text-gray-400">信号等待时间</div>
+                            <div id="signalWaitTime" class="text-xl font-bold text-cyan-400">--:--</div>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-2">
+                            <div id="waitProgress" class="bg-cyan-500 h-2 rounded-full progress-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <button onclick="manualCheckTP_SL()" 
+                            class="w-full p-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors">
+                        <i class="fas fa-search-dollar mr-2"></i>手动检查TP/SL状态
+                    </button>
+                    
+                    <button onclick="forceNewSignal()" 
+                            class="w-full p-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold transition-colors">
+                        <i class="fas fa-bolt mr-2"></i>强制生成新信号
+                    </button>
+                    
+                    <div class="text-xs text-gray-500 text-center pt-4">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        等待TP/SL触发可避免过度交易
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 历史记录 -->
+        <div class="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700 mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-semibold">
+                    <i class="fas fa-list-alt text-green-400 mr-2"></i>交易信号历史
+                </h2>
+                <div class="flex space-x-2">
+                    <button onclick="showAllSignals()" class="px-3 py-1 bg-gray-700 rounded text-sm hover:bg-gray-600 transition-colors">全部</button>
+                    <button onclick="showOnlyProfitable()" class="px-3 py-1 bg-green-700 rounded text-sm hover:bg-green-600 transition-colors">盈利</button>
+                    <button onclick="exportSignals()" class="px-3 py-1 bg-blue-600 rounded text-sm hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-download mr-1"></i>导出
+                    </button>
+                    <button onclick="clearHistory()" class="px-3 py-1 bg-red-600 rounded text-sm hover:bg-red-700 transition-colors">
+                        <i class="fas fa-trash-alt mr-1"></i>清空
+                    </button>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="py-3 text-left text-gray-400">时间</th>
+                            <th class="py-3 text-left text-gray-400">信号</th>
+                            <th class="py-3 text-left text-gray-400">入场价</th>
+                            <th class="py-3 text-left text-gray-400">TP1/TP2/SL</th>
+                            <th class="py-3 text-left text-gray-400">仓位(USDT)</th>
+                            <th class="py-3 text-left text-gray-400">状态</th>
+                            <th class="py-3 text-left text-gray-400">结果</th>
+                        </tr>
+                    </thead>
+                    <tbody id="signalHistory">
+                        <tr>
+                            <td colspan="7" class="py-8 text-center text-gray-500">
+                                <i class="fas fa-chart-line text-3xl mb-2"></i>
+                                <div>等待第一个交易信号生成...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="mt-6 pt-4 border-t border-gray-700">
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <div class="text-gray-400 text-sm">总交易数</div>
+                        <div id="totalTrades" class="text-xl font-bold">0</div>
+                    </div>
+                    <div>
+                        <div class="text-gray-400 text-sm">胜率</div>
+                        <div id="winRate" class="text-xl font-bold text-green-400">0%</div>
+                    </div>
+                    <div>
+                        <div class="text-gray-400 text-sm">总盈亏</div>
+                        <div id="totalPnL" class="text-xl font-bold">$0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 系统状态栏（固定在底部） -->
+        <div class="fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 p-3">
+            <div class="container mx-auto flex justify-between items-center text-sm">
+                <div>
+                    <span class="text-gray-400">系统状态:</span>
+                    <span id="connectionStatus" class="ml-2 text-green-400 blink">
+                        <i class="fas fa-circle mr-1"></i>正在连接...
+                    </span>
+                </div>
+                <div>
+                    <span class="text-gray-400">API调用:</span>
+                    <span id="apiCalls" class="ml-2">0</span>
+                </div>
+                <div>
+                    <span class="text-gray-400">最后更新:</span>
+                    <span id="lastUpdate" class="ml-2">--:--:--</span>
+                </div>
+                <div>
+                    <span class="text-gray-400">版本:</span>
+                    <span class="ml-2 text-yellow-400">v2.1</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 页脚 -->
+        <div class="mt-12 pb-20 text-center text-gray-500 text-sm">
+            <p>BTC/USDT AI Trading System v2.1 | 强化AI分析 + TP/SL监控系统</p>
+            <p class="mt-2">风险提示: 所有信号仅供参考，历史表现不代表未来结果，投资需谨慎</p>
+            <div class="mt-4 flex justify-center space-x-4">
+                <button onclick="refreshAllData()" class="px-4 py-2 bg-yellow-600 rounded hover:bg-yellow-700 transition-colors">
+                    <i class="fas fa-sync-alt mr-2"></i>刷新数据
+                </button>
+                <button onclick="resetSystem()" class="px-4 py-2 bg-red-600 rounded hover:bg-red-700 transition-colors">
+                    <i class="fas fa-redo mr-2"></i>重置系统
+                </button>
+                <button onclick="testAPIConnection()" class="px-4 py-2 bg-indigo-600 rounded hover:bg-indigo-700 transition-colors">
+                    <i class="fas fa-wifi mr-2"></i>测试连接
+                </button>
+                <button onclick="showSettings()" class="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 transition-colors">
+                    <i class="fas fa-cog mr-2"></i>设置
+                </button>
+                <button onclick="startAutoMode()" class="px-4 py-2 bg-green-600 rounded hover:bg-green-700 transition-colors">
+                    <i class="fas fa-play mr-2"></i>启动
+                </button>
+                <button onclick="stopAutoMode()" class="px-4 py-2 bg-red-600 rounded hover:bg-red-700 transition-colors">
+                    <i class="fas fa-stop mr-2"></i>停止
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript 代码 -->
+    <script>
+        // ==================== 自动交易系统主类 ====================
+        class AutoTradingSystem {
+            constructor() {
+                // OKX API配置
+                this.API_BASE = 'https://www.okx.com/api/v5';
+                this.currentSymbol = 'BTC-USDT';
+                
+                // 交易参数配置（优化后的保守参数）
+                this.TRADE_CONFIG = {
+                    accountBalance: 100,       // USDT本金
+                    riskPerTrade: 0.02,        // 每笔交易风险2%
+                    tp1Percent: 0.015,         // TP1: 1.5% (微利)
+                    tp2Percent: 0.03,          // TP2: 3% (中利)
+                    slPercent: 0.012,          // SL: 1.2% (小损)
+                    cooldownTime: 180,         // 冷却时间3分钟
+                    maxPositionPercent: 0.5,   // 最大仓位50%
+                    minRSI: 28,                // RSI超卖阈值
+                    maxRSI: 72,                // RSI超买阈值
+                    rsiNeutralMin: 42,         // RSI中性区间最小值
+                    rsiNeutralMax: 58,         // RSI中性区间最大值
+                    highVolatility: 5,         // 高波动率阈值（%）
+                    trendThreshold: 0.5        // 趋势阈值（%）
+                };
+                
+                // 存储键
+                this.STORAGE_KEYS = {
+                    signals: 'auto_trading_signals_v2',
+                    state: 'auto_trading_state_v2',
+                    settings: 'auto_trading_settings_v2'
+                };
+                
+                // 系统状态
+                this.systemState = {
+                    lastSignal: null,
+                    activeTrade: null,
+                    signalHistory: [],
+                    stats: {
+                        totalTrades: 0,
+                        winningTrades: 0,
+                        totalPnL: 0,
+                        currentStreak: 0,
+                        bestStreak: 0,
+                        maxWin: 0,
+                        maxLoss: 0,
+                        avgWin: 0,
+                        avgLoss: 0
+                    },
+                    indicators: {
+                        rsi: 50,
+                        trend: 'neutral',
+                        volatility: 0,
+                        support: 0,
+                        resistance: 0,
+                        pricePosition: 50
+                    },
+                    lastUpdate: null,
+                    cooldownEnd: null,
+                    isInitialized: false,
+                    apiCallCount: 0
+                };
+                
+                // 价格数据
+                this.priceData = [];
+                this.currentPrice = 0;
+                this.chartData = [];
+                
+                // 控制变量
+                this.isRunning = false;
+                this.intervals = {
+                    priceUpdate: null,
+                    signalCheck: null,
+                    chartUpdate: null
+                };
+                
+                // 图表实例
+                this.chart = null;
+                
+                console.log('🚀 AutoTradingSystem 初始化');
+            }
+            
+            // 初始化系统
+            async init() {
+                try {
+                    console.log('🔧 正在初始化系统...');
+                    this.showSystemStatus('正在初始化系统...', 'loading');
+                    
+                    // 加载保存的状态
+                    this.loadSystemState();
+                    
+                    // 初始化图表
+                    this.initChart();
+                    
+                    // 测试API连接
+                    await this.testAPIConnection();
+                    
+                    // 获取初始数据
+                    await this.loadInitialData();
+                    
+                    // 更新所有显示
+                    this.updateAllDisplays();
+                    
+                    // 启动自动模式
+                    this.startAutoMode();
+                    
+                    // 标记为已初始化
+                    this.systemState.isInitialized = true;
+                    this.saveSystemState();
+                    
+                    this.showSystemStatus('系统运行正常', 'success');
+                    console.log('✅ 系统初始化完成');
+                    
+                } catch (error) {
+                    console.error('初始化失败:', error);
+                    this.showSystemStatus('初始化失败，请刷新页面重试', 'error');
+                }
+            }
+            
+            // 测试API连接
+            async testAPIConnection() {
+                try {
+                    const response = await this.fetchWithRetry(`${this.API_BASE}/public/time`);
+                    const data = await response.json();
+                    
+                    if (data.code === '0') {
+                        console.log('✅ OKX API连接正常');
+                        return true;
+                    } else {
+                        throw new Error(`API错误: ${data.msg}`);
+                    }
+                } catch (error) {
+                    console.error('API连接测试失败:', error);
+                    throw error;
+                }
+            }
+            
+            // 带重试的fetch
+            async fetchWithRetry(url, options = {}, maxRetries = 3) {
+                let lastError;
+                
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        const response = await fetch(url, options);
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                        this.systemState.apiCallCount++;
+                        this.updateAPICallsDisplay();
+                        return response;
+                    } catch (error) {
+                        lastError = error;
+                        console.log(`重试 ${i + 1}/${maxRetries}: ${error.message}`);
+                        if (i < maxRetries - 1) {
+                            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+                        }
+                    }
+                }
+                
+                throw lastError;
+            }
+            
+            // 加载初始数据
+            async loadInitialData() {
+                try {
+                    // 获取当前价格
+                    const price = await this.getCurrentPrice();
+                    if (price) {
+                        this.currentPrice = price;
+                        this.updatePriceDisplay();
+                    }
+                    
+                    // 获取K线数据
+                    const candles = await this.getCandleData('15m', 30);
+                    if (candles.length > 0) {
+                        this.processCandleData(candles);
+                    }
+                    
+                    // 如果有活跃交易，更新显示
+                    if (this.systemState.activeTrade) {
+                        this.displaySignal(this.systemState.activeTrade);
+                        this.updateTradeStatus('进行中', '交易执行中...');
+                    }
+                    
+                } catch (error) {
+                    console.error('加载初始数据失败:', error);
+                    throw error;
+                }
+            }
+            
+            // 获取当前价格
+            async getCurrentPrice() {
+                try {
+                    const response = await this.fetchWithRetry(
+                        `${this.API_BASE}/market/ticker?instId=${this.currentSymbol}`
+                    );
+                    const data = await response.json();
+                    
+                    if (data.code === '0' && data.data && data.data[0]) {
+                        const ticker = data.data[0];
+                        const price = parseFloat(ticker.last);
+                        
+                        // 更新价格数据
+                        this.currentPrice = price;
+                        
+                        // 更新24小时数据
+                        this.updateMarketData(ticker);
+                        
+                        return price;
+                    } else {
+                        throw new Error('无法获取价格数据');
+                    }
+                } catch (error) {
+                    console.error('获取价格失败:', error.message);
+                    return null;
+                }
+            }
+            
+            // 获取K线数据
+            async getCandleData(interval = '15m', limit = 30) {
+                try {
+                    const response = await this.fetchWithRetry(
+                        `${this.API_BASE}/market/candles?instId=${this.currentSymbol}&bar=${interval}&limit=${limit}`
+                    );
+                    const data = await response.json();
+                    
+                    if (data.code === '0' && data.data) {
+                        return data.data.map(candle => ({
+                            timestamp: parseInt(candle[0]),
+                            open: parseFloat(candle[1]),
+                            high: parseFloat(candle[2]),
+                            low: parseFloat(candle[3]),
+                            close: parseFloat(candle[4]),
+                            volume: parseFloat(candle[5])
+                        })).reverse();
+                    } else {
+                        throw new Error('无法获取K线数据');
+                    }
+                } catch (error) {
+                    console.error('获取K线数据失败:', error.message);
+                    return [];
+                }
+            }
+            
+            // 处理K线数据
+            processCandleData(candles) {
+                if (!candles || candles.length < 10) return;
+                
+                // 更新价格历史
+                this.chartData = candles.slice(-20).map(candle => ({
+                    time: new Date(candle.timestamp).toLocaleTimeString('zh-CN', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }),
+                    price: candle.close
+                }));
+                
+                // 计算技术指标
+                this.calculateIndicators(candles);
+                
+                // 更新图表
+                this.updateChart();
+            }
+            
+            // 计算技术指标
+            calculateIndicators(candles) {
+                const closes = candles.map(c => c.close);
+                const highs = candles.map(c => c.high);
+                const lows = candles.map(c => c.low);
+                
+                // 计算RSI
+                const rsi = this.calculateRSI(closes);
+                
+                // 计算支撑阻力位
+                const sr = this.calculateSupportResistance(highs, lows, this.currentPrice);
+                
+                // 计算趋势
+                const trend = this.calculateTrend(closes);
+                
+                // 计算波动率
+                const volatility = this.calculateVolatility(closes);
+                
+                // 更新指标
+                this.systemState.indicators = {
+                    rsi,
+                    trend,
+                    volatility,
+                    support: sr.support,
+                    resistance: sr.resistance,
+                    pricePosition: sr.pricePosition,
+                    distanceToResistance: sr.distanceToResistance,
+                    distanceToSupport: sr.distanceToSupport
+                };
+                
+                // 更新指标显示
+                this.updateIndicatorsDisplay();
+            }
+            
+            // 计算RSI
+            calculateRSI(closes) {
+                if (closes.length < 14) return 50;
+                
+                let gains = 0;
+                let losses = 0;
+                
+                // 计算初始平均值
+                for (let i = 1; i < 14; i++) {
+                    const change = closes[i] - closes[i - 1];
+                    if (change > 0) {
+                        gains += change;
+                    } else {
+                        losses += Math.abs(change);
+                    }
+                }
+                
+                let avgGain = gains / 13;
+                let avgLoss = losses / 13;
+                
+                // 计算后续值
+                for (let i = 14; i < closes.length; i++) {
+                    const change = closes[i] - closes[i - 1];
+                    const gain = change > 0 ? change : 0;
+                    const loss = change < 0 ? Math.abs(change) : 0;
+                    
+                    avgGain = (avgGain * 13 + gain) / 14;
+                    avgLoss = (avgLoss * 13 + loss) / 14;
+                }
+                
+                if (avgLoss === 0) return 100;
+                const rs = avgGain / avgLoss;
+                return 100 - (100 / (1 + rs));
+            }
+            
+            // 计算支撑阻力位
+            calculateSupportResistance(highs, lows, currentPrice) {
+                const recentHighs = highs.slice(-20);
+                const recentLows = lows.slice(-20);
+                
+                const resistance = Math.max(...recentHighs);
+                const support = Math.min(...recentLows);
+                
+                let pricePosition = 50;
+                if (resistance > support) {
+                    pricePosition = ((currentPrice - support) / (resistance - support) * 100);
+                }
+                
+                return {
+                    support,
+                    resistance,
+                    pricePosition: Math.max(0, Math.min(100, pricePosition)),
+                    distanceToResistance: ((resistance - currentPrice) / currentPrice * 100).toFixed(2),
+                    distanceToSupport: ((currentPrice - support) / currentPrice * 100).toFixed(2)
+                };
+            }
+            
+            // 计算趋势
+            calculateTrend(closes) {
+                if (closes.length < 10) return 'neutral';
+                
+                const shortTerm = closes.slice(-5);
+                const longTerm = closes.slice(-10);
+                
+                const shortAvg = shortTerm.reduce((a, b) => a + b) / shortTerm.length;
+                const longAvg = longTerm.reduce((a, b) => a + b) / longTerm.length;
+                
+                const change = ((shortAvg - longAvg) / longAvg) * 100;
+                
+                if (change > this.TRADE_CONFIG.trendThreshold) return 'bullish';
+                if (change < -this.TRADE_CONFIG.trendThreshold) return 'bearish';
+                return 'neutral';
+            }
+            
+            // 计算波动率
+            calculateVolatility(closes) {
+                if (closes.length < 10) return 0;
+                
+                const returns = [];
+                for (let i = 1; i < closes.length; i++) {
+                    returns.push((closes[i] - closes[i-1]) / closes[i-1]);
+                }
+                
+                const mean = returns.reduce((a, b) => a + b) / returns.length;
+                const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length;
+                
+                return Math.sqrt(variance) * Math.sqrt(252) * 100;
+            }
+            
+            // 生成交易信号
+            async generateSignal() {
+                // 检查是否在冷却期
+                if (this.isInCooldown()) {
+                    console.log('⏳ 冷却期，跳过信号生成');
+                    this.updateCooldownDisplay();
+                    return;
+                }
+                
+                // 检查是否有活跃交易
+                if (this.systemState.activeTrade) {
+                    console.log('🔄 有活跃交易，等待完成');
+                    return;
+                }
+                
+                console.log('🔍 开始分析市场，生成信号...');
+                this.showSystemStatus('分析市场数据中...', 'loading');
+                
+                try {
+                    // 获取当前价格
+                    const price = await this.getCurrentPrice();
+                    if (!price) {
+                        this.showSystemStatus('获取价格失败', 'error');
+                        return;
+                    }
+                    
+                    // 获取K线数据
+                    const candles = await this.getCandleData('15m', 30);
+                    if (candles.length < 20) {
+                        this.showSystemStatus('数据不足，无法分析', 'warning');
+                        return;
+                    }
+                    
+                    // 重新计算指标
+                    this.calculateIndicators(candles);
+                    
+                    // 分析市场
+                    const signal = this.analyzeMarket();
+                    
+                    // 如果有交易信号
+                    if (signal.action !== 'HOLD') {
+                        // 创建交易记录
+                        const trade = this.createTradeRecord(signal, price);
+                        
+                        // 设置活跃交易
+                        this.systemState.activeTrade = trade;
+                        this.systemState.lastSignal = trade;
+                        
+                        // 添加到历史
+                        this.addToHistory(trade);
+                        
+                        // 更新UI
+                        this.displaySignal(trade);
+                        this.updateTradeStatus('进行中', `新信号: ${trade.action}`);
+                        
+                        // 保存状态
+                        this.saveSystemState();
+                        
+                        this.showSystemStatus(`新信号生成: ${trade.action}`, 'success');
+                        console.log(`✅ 信号生成: ${trade.action}, 价格: $${price}, RSI: ${this.systemState.indicators.rsi.toFixed(1)}`);
+                        
+                    } else {
+                        this.updateTradeStatus('观望', signal.reason);
+                        this.showSystemStatus('市场条件不适合交易', 'info');
+                        console.log('⏸️ 无交易信号:', signal.reason);
+                    }
+                    
+                } catch (error) {
+                    console.error('生成信号失败:', error);
+                    this.showSystemStatus('生成信号失败', 'error');
+                }
+            }
+            
+            // 分析市场
+            analyzeMarket() {
+                const indicators = this.systemState.indicators;
+                const { rsi, trend, volatility, pricePosition } = indicators;
+                
+                let action = 'HOLD';
+                let confidence = 0.5;
+                let reason = '';
+                
+                // RSI信号
+                if (rsi < this.TRADE_CONFIG.minRSI) {
+                    // RSI超卖，可能买入机会
+                    if (trend === 'bullish' || trend === 'neutral') {
+                        action = 'BUY';
+                        confidence = 0.7 + (this.TRADE_CONFIG.minRSI - rsi) / 50;
+                        reason = `RSI超卖(${rsi.toFixed(1)} < ${this.TRADE_CONFIG.minRSI})，趋势${trend === 'bullish' ? '向上' : '中性'}`;
+                        
+                        if (pricePosition < 40) {
+                            reason += `，价格接近支撑位(${pricePosition.toFixed(1)}%)`;
+                            confidence += 0.05;
+                        }
+                    } else {
+                        reason = `RSI超卖(${rsi.toFixed(1)})但趋势向下，等待确认`;
+                    }
+                    
+                } else if (rsi > this.TRADE_CONFIG.maxRSI) {
+                    // RSI超买，可能卖出机会
+                    if (trend === 'bearish' || trend === 'neutral') {
+                        action = 'SELL';
+                        confidence = 0.7 + (rsi - this.TRADE_CONFIG.maxRSI) / 50;
+                        reason = `RSI超买(${rsi.toFixed(1)} > ${this.TRADE_CONFIG.maxRSI})，趋势${trend === 'bearish' ? '向下' : '中性'}`;
+                        
+                        if (pricePosition > 60) {
+                            reason += `，价格接近阻力位(${pricePosition.toFixed(1)}%)`;
+                            confidence += 0.05;
+                        }
+                    } else {
+                        reason = `RSI超买(${rsi.toFixed(1)})但趋势向上，等待确认`;
+                    }
+                    
+                } else if (rsi > this.TRADE_CONFIG.rsiNeutralMin && rsi < this.TRADE_CONFIG.rsiNeutralMax) {
+                    // RSI中性区间
+                    reason = `RSI中性(${rsi.toFixed(1)})，市场平衡`;
+                    confidence = 0.6;
+                    
+                } else {
+                    // RSI在正常区间
+                    if (pricePosition < 30 && trend !== 'bearish') {
+                        action = 'BUY';
+                        confidence = 0.65;
+                        reason = `价格接近支撑位(${pricePosition.toFixed(1)}%)，RSI适中(${rsi.toFixed(1)})`;
+                    } else if (pricePosition > 70 && trend !== 'bullish') {
+                        action = 'SELL';
+                        confidence = 0.65;
+                        reason = `价格接近阻力位(${pricePosition.toFixed(1)}%)，RSI适中(${rsi.toFixed(1)})`;
+                    } else {
+                        reason = `市场无明显信号，RSI: ${rsi.toFixed(1)}，位置: ${pricePosition.toFixed(1)}%，趋势: ${trend}`;
+                    }
+                }
+                
+                // 波动率过滤
+                if (volatility > this.TRADE_CONFIG.highVolatility) {
+                    confidence *= 0.8;
+                    reason += ` | 高波动率(${volatility.toFixed(1)}%)降低信号强度`;
+                }
+                
+                // 限制置信度范围
+                confidence = Math.max(0.3, Math.min(0.95, confidence));
+                
+                return {
+                    action,
+                    confidence: confidence.toFixed(2),
+                    reason,
+                    rsi: rsi.toFixed(2),
+                    trend,
+                    volatility: volatility.toFixed(1),
+                    pricePosition: pricePosition.toFixed(1)
+                };
+            }
+            
+            // 创建交易记录
+            createTradeRecord(signal, price) {
+                // 计算交易参数
+                const params = this.calculateTradeParams(signal.action, price, parseFloat(signal.confidence));
+                
+                // 生成唯一ID
+                const id = `trade_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                
+                return {
+                    id,
+                    action: signal.action,
+                    confidence: signal.confidence,
+                    price: price.toFixed(2),
+                    tp1: params.tp1.toFixed(2),
+                    tp2: params.tp2.toFixed(2),
+                    sl: params.sl.toFixed(2),
+                    positionSize: params.positionSize,
+                    positionPercent: params.positionPercent,
+                    riskReward: params.riskReward,
+                    reason: signal.reason,
+                    rsi: signal.rsi,
+                    symbol: this.currentSymbol,
+                    timestamp: new Date().toISOString(),
+                    status: 'active',
+                    result: null,
+                    pnl: null,
+                    exitPrice: null,
+                    completedAt: null
+                };
+            }
+            
+            // 计算交易参数
+            calculateTradeParams(action, price, confidence) {
+                let tp1, tp2, sl;
+                
+                // 计算TP/SL
+                if (action === 'BUY') {
+                    tp1 = price * (1 + this.TRADE_CONFIG.tp1Percent);
+                    tp2 = price * (1 + this.TRADE_CONFIG.tp2Percent);
+                    sl = price * (1 - this.TRADE_CONFIG.slPercent);
+                } else if (action === 'SELL') {
+                    tp1 = price * (1 - this.TRADE_CONFIG.tp1Percent);
+                    tp2 = price * (1 - this.TRADE_CONFIG.tp2Percent);
+                    sl = price * (1 + this.TRADE_CONFIG.slPercent);
+                }
+                
+                // 计算风险回报比
+                const risk = Math.abs(price - sl);
+                const reward = Math.abs(tp1 - price);
+                const riskReward = (reward / risk).toFixed(2);
+                
+                // 计算建议仓位
+                const riskAmount = this.TRADE_CONFIG.accountBalance * this.TRADE_CONFIG.riskPerTrade;
+                const positionSize = Math.min(
+                    (riskAmount / (risk / price)),
+                    this.TRADE_CONFIG.accountBalance * this.TRADE_CONFIG.maxPositionPercent
+                );
+                const positionPercent = ((positionSize / this.TRADE_CONFIG.accountBalance) * 100).toFixed(1);
+                
+                return {
+                    tp1,
+                    tp2,
+                    sl,
+                    riskReward,
+                    positionSize: positionSize.toFixed(2),
+                    positionPercent
+                };
+            }
+            
+            // 检查交易条件
+            checkTradeConditions() {
+                if (!this.systemState.activeTrade || !this.currentPrice) return;
+                
+                const trade = this.systemState.activeTrade;
+                const price = parseFloat(trade.price);
+                const current = this.currentPrice;
+                const tp1 = parseFloat(trade.tp1);
+                const tp2 = parseFloat(trade.tp2);
+                const sl = parseFloat(trade.sl);
+                
+                let triggered = false;
+                let result = null;
+                let tpLevel = 0;
+                
+                if (trade.action === 'BUY') {
+                    if (current >= tp2) {
+                        result = 'win';
+                        tpLevel = 2;
+                        triggered = true;
+                    } else if (current >= tp1) {
+                        result = 'win';
+                        tpLevel = 1;
+                        triggered = true;
+                    } else if (current <= sl) {
+                        result = 'loss';
+                        triggered = true;
+                    }
+                } else if (trade.action === 'SELL') {
+                    if (current <= tp2) {
+                        result = 'win';
+                        tpLevel = 2;
+                        triggered = true;
+                    } else if (current <= tp1) {
+                        result = 'win';
+                        tpLevel = 1;
+                        triggered = true;
+                    } else if (current >= sl) {
+                        result = 'loss';
+                        triggered = true;
+                    }
+                }
+                
+                if (triggered) {
+                    this.completeTrade(result, tpLevel, current);
+                } else {
+                    this.updateDistanceDisplay(trade, current);
+                }
+            }
+            
+            // 完成交易
+            completeTrade(result, tpLevel, currentPrice) {
+                const trade = this.systemState.activeTrade;
+                
+                // 计算盈亏
+                const positionSize = parseFloat(trade.positionSize);
+                const entry = parseFloat(trade.price);
+                let pnl = 0;
+                
+                if (result === 'win') {
+                    const tpPrice = tpLevel === 1 ? parseFloat(trade.tp1) : parseFloat(trade.tp2);
+                    
+                    if (trade.action === 'BUY') {
+                        pnl = (tpPrice - entry) * (positionSize / entry);
+                    } else {
+                        pnl = (entry - tpPrice) * (positionSize / entry);
+                    }
+                } else {
+                    const slPrice = parseFloat(trade.sl);
+                    if (trade.action === 'BUY') {
+                        pnl = (slPrice - entry) * (positionSize / entry);
+                    } else {
+                        pnl = (entry - slPrice) * (positionSize / entry);
+                    }
+                }
+                
+                // 更新交易记录
+                trade.status = result === 'win' ? 
+                    (tpLevel === 1 ? 'hit_tp1' : 'hit_tp2') : 
+                    'hit_sl';
+                trade.result = result;
+                trade.pnl = pnl.toFixed(2);
+                trade.exitPrice = currentPrice.toFixed(2);
+                trade.completedAt = new Date().toISOString();
+                
+                // 更新统计数据
+                this.updateStats(result, pnl);
+                
+                // 显示结果
+                const resultText = result === 'win' ? 
+                    `${tpLevel === 2 ? '第二止盈' : '第一止盈'}达成，盈利 $${pnl.toFixed(2)}` :
+                    `止损触发，亏损 $${Math.abs(pnl).toFixed(2)}`;
+                
+                this.updateTradeStatus('已完成', resultText);
+                
+                // 高亮显示
+                this.highlightTradeResult(result, tpLevel);
+                
+                // 清除活跃交易
+                this.systemState.activeTrade = null;
+                
+                // 保存状态
+                this.saveSystemState();
+                
+                // 显示通知
+                this.showSystemStatus(`交易完成: ${resultText}`, result === 'win' ? 'success' : 'error');
+                
+                // 开始冷却时间
+                this.startCooldownPeriod();
+                
+                console.log(`🎯 交易完成: ${result}, PnL: $${pnl.toFixed(2)}`);
+            }
+            
+            // 更新统计数据
+            updateStats(result, pnl) {
+                const stats = this.systemState.stats;
+                
+                stats.totalTrades++;
+                
+                if (result === 'win') {
+                    stats.winningTrades++;
+                    stats.currentStreak++;
+                    
+                    if (stats.currentStreak > stats.bestStreak) {
+                        stats.bestStreak = stats.currentStreak;
+                    }
+                    
+                    // 更新最大盈利
+                    if (pnl > stats.maxWin) {
+                        stats.maxWin = pnl;
+                    }
+                    
+                    // 更新平均盈利
+                    const winCount = stats.winningTrades - 1;
+                    stats.avgWin = winCount > 0 ? 
+                        ((stats.avgWin * winCount) + pnl) / stats.winningTrades : 
+                        pnl;
+                        
+                } else {
+                    stats.currentStreak = 0;
+                    
+                    // 更新最大亏损
+                    if (pnl < stats.maxLoss) {
+                        stats.maxLoss = pnl;
+                    }
+                    
+                    // 更新平均亏损
+                    const lossCount = (stats.totalTrades - stats.winningTrades) - 1;
+                    stats.avgLoss = lossCount > 0 ? 
+                        ((stats.avgLoss * lossCount) + pnl) / (stats.totalTrades - stats.winningTrades) : 
+                        pnl;
+                }
+                
+                stats.totalPnL += pnl;
+                
+                // 更新显示
+                this.updateStatsDisplay();
+            }
+            
+            // ==================== UI更新方法 ====================
+            
+            // 显示系统状态
+            showSystemStatus(message, type = 'info') {
+                const statusElement = document.getElementById('systemStatus');
+                if (!statusElement) return;
+                
+                const colors = {
+                    info: 'text-blue-400',
+                    success: 'text-green-400',
+                    warning: 'text-yellow-400',
+                    error: 'text-red-400',
+                    loading: 'text-purple-400'
+                };
+                
+                const icons = {
+                    info: 'ℹ️',
+                    success: '✅',
+                    warning: '⚠️',
+                    error: '❌',
+                    loading: '⏳'
+                };
+                
+                statusElement.innerHTML = `${icons[type] || ''} ${message}`;
+                statusElement.className = colors[type] || colors.info;
+                
+                console.log(`系统状态: ${message}`);
+            }
+            
+            // 更新价格显示
+            updatePriceDisplay() {
+                const priceElement = document.getElementById('priceDisplay');
+                const timeElement = document.getElementById('updateTime');
+                const monitorElement = document.getElementById('monitorCurrent');
+                
+                if (priceElement) {
+                    priceElement.textContent = `$${this.currentPrice.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    })}`;
+                }
+                
+                if (timeElement) {
+                    timeElement.textContent = new Date().toLocaleTimeString('zh-CN');
+                }
+                
+                if (monitorElement) {
+                    monitorElement.textContent = `$${this.currentPrice.toLocaleString('en-US', {
+                        minimumFractionDigits: 2
+                    })}`;
+                }
+            }
+            
+            // 更新市场数据
+            updateMarketData(ticker) {
+                const highElement = document.getElementById('high24h');
+                const lowElement = document.getElementById('low24h');
+                
+                if (highElement && ticker.high24h) {
+                    highElement.textContent = `$${parseFloat(ticker.high24h).toLocaleString('en-US', {
+                        minimumFractionDigits: 2
+                    })}`;
+                }
+                
+                if (lowElement && ticker.low24h) {
+                    lowElement.textContent = `$${parseFloat(ticker.low24h).toLocaleString('en-US', {
+                        minimumFractionDigits: 2
+                    })}`;
+                }
+            }
+            
+            // 更新指标显示
+            updateIndicatorsDisplay() {
+                const indicators = this.systemState.indicators;
+                
+                // RSI显示
+                const rsiElement = document.getElementById('aiRsi');
+                const rsiSignalElement = document.getElementById('rsiSignal');
+                
+                if (rsiElement) {
+                    rsiElement.textContent = indicators.rsi.toFixed(2);
+                    
+                    if (indicators.rsi < this.TRADE_CONFIG.minRSI) {
+                        rsiElement.className = 'text-2xl font-bold text-green-400';
+                        if (rsiSignalElement) {
+                            rsiSignalElement.textContent = '超卖';
+                            rsiSignalElement.className = 'text-xs text-green-400 mt-1';
+                        }
+                    } else if (indicators.rsi > this.TRADE_CONFIG.maxRSI) {
+                        rsiElement.className = 'text-2xl font-bold text-red-400';
+                        if (rsiSignalElement) {
+                            rsiSignalElement.textContent = '超买';
+                            rsiSignalElement.className = 'text-xs text-red-400 mt-1';
+                        }
+                    } else {
+                        rsiElement.className = 'text-2xl font-bold text-yellow-400';
+                        if (rsiSignalElement) {
+                            rsiSignalElement.textContent = '中性';
+                            rsiSignalElement.className = 'text-xs text-yellow-400 mt-1';
+                        }
+                    }
+                }
+                
+                // 趋势强度
+                const trendElement = document.getElementById('trendStrength');
+                if (trendElement) {
+                    let strength = 50;
+                    if (indicators.trend === 'bullish') strength = 75;
+                    if (indicators.trend === 'bearish') strength = 25;
+                    
+                    trendElement.textContent = `${strength}%`;
+                    
+                    if (strength > 60) {
+                        trendElement.className = 'text-2xl font-bold text-green-400';
+                    } else if (strength < 40) {
+                        trendElement.className = 'text-2xl font-bold text-red-400';
+                    } else {
+                        trendElement.className = 'text-2xl font-bold text-yellow-400';
+                    }
+                }
+                
+                // 支撑阻力位
+                const srElement = document.getElementById('srLevel');
+                if (srElement) {
+                    srElement.textContent = `${indicators.pricePosition.toFixed(1)}%`;
+                }
+                
+                // 更新分析文本
+                const analysisElement = document.getElementById('analysisText');
+                const decisionElement = document.getElementById('decisionLogic');
+                
+                if (analysisElement) {
+                    analysisElement.textContent = `RSI: ${indicators.rsi.toFixed(1)} | 趋势: ${indicators.trend} | 位置: ${indicators.pricePosition.toFixed(1)}%`;
+                }
+                
+                if (decisionElement) {
+                    if (indicators.rsi < this.TRADE_CONFIG.minRSI) {
+                        decisionElement.textContent = 'RSI超卖，关注买入机会';
+                    } else if (indicators.rsi > this.TRADE_CONFIG.maxRSI) {
+                        decisionElement.textContent = 'RSI超买，关注卖出机会';
+                    } else {
+                        decisionElement.textContent = 'RSI中性，等待明确信号';
+                    }
+                }
+            }
+            
+            // 显示信号
+            displaySignal(signal) {
+                if (!signal) return;
+                
+                const card = document.getElementById('signalCard');
+                const actionElement = document.getElementById('signalAction');
+                const confidenceElement = document.getElementById('signalConfidence');
+                const timeElement = document.getElementById('signalTime');
+                const analysisElement = document.getElementById('analysisText');
+                
+                // 设置卡片样式
+                if (card) {
+                    card.className = 'rounded-xl p-6 shadow-lg border-2';
+                    
+                    if (signal.action === 'BUY') {
+                        card.classList.add('signal-buy');
+                        if (actionElement) {
+                            actionElement.innerHTML = '🔼 BUY';
+                            actionElement.className = 'text-5xl font-bold text-green-400 mb-4';
+                        }
+                    } else if (signal.action === 'SELL') {
+                        card.classList.add('signal-sell');
+                        if (actionElement) {
+                            actionElement.innerHTML = '🔽 SELL';
+                            actionElement.className = 'text-5xl font-bold text-red-400 mb-4';
+                        }
+                    } else {
+                        card.classList.add('signal-hold');
+                        if (actionElement) {
+                            actionElement.textContent = '⏸️ HOLD';
+                            actionElement.className = 'text-5xl font-bold text-gray-400 mb-4';
+                        }
+                    }
+                }
+                
+                // 更新信号信息
+                if (confidenceElement) {
+                    confidenceElement.textContent = `${(parseFloat(signal.confidence) * 100).toFixed(0)}%`;
+                }
+                
+                if (timeElement && signal.timestamp) {
+                    timeElement.textContent = `生成: ${new Date(signal.timestamp).toLocaleTimeString('zh-CN', { 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        second: '2-digit'
+                    })}`;
+                }
+                
+                if (analysisElement) {
+                    analysisElement.textContent = signal.reason || 'AI分析完成';
+                }
+                
+                // 更新交易参数
+                const entryPriceElement = document.getElementById('entryPrice');
+                const tp1Element = document.getElementById('takeProfit1');
+                const tp2Element = document.getElementById('takeProfit2');
+                const slElement = document.getElementById('stopLoss');
+                const riskRewardElement = document.getElementById('riskReward');
+                const positionSizeElement = document.getElementById('positionSize');
+                const positionPercentElement = document.getElementById('positionPercent');
+                
+                if (entryPriceElement) entryPriceElement.textContent = `$${signal.price}`;
+                if (tp1Element) tp1Element.textContent = `$${signal.tp1}`;
+                if (tp2Element) tp2Element.textContent = `$${signal.tp2}`;
+                if (slElement) slElement.textContent = `$${signal.sl}`;
+                if (riskRewardElement) riskRewardElement.textContent = `${signal.riskReward}:1`;
+                if (positionSizeElement) positionSizeElement.textContent = `${signal.positionSize} USDT`;
+                if (positionPercentElement) positionPercentElement.textContent = `${signal.positionPercent}%`;
+            }
+            
+            // 更新距离显示
+            updateDistanceDisplay(trade, currentPrice) {
+                const entry = parseFloat(trade.price);
+                const tp1 = parseFloat(trade.tp1);
+                const sl = parseFloat(trade.sl);
+                
+                let distanceTP1, distanceSL;
+                
+                if (trade.action === 'BUY') {
+                    distanceTP1 = ((currentPrice - entry) / entry * 100).toFixed(2);
+                    distanceSL = ((entry - currentPrice) / entry * 100).toFixed(2);
+                } else {
+                    distanceTP1 = ((entry - currentPrice) / entry * 100).toFixed(2);
+                    distanceSL = ((currentPrice - entry) / entry * 100).toFixed(2);
+                }
+                
+                // 更新UI元素
+                const tp1Element = document.getElementById('distanceTP1');
+                const slElement = document.getElementById('distanceSL');
+                const progressElement = document.getElementById('priceProgress');
+                
+                if (tp1Element) {
+                    tp1Element.textContent = `${distanceTP1}%`;
+                    tp1Element.className = distanceTP1 > 0 ? 
+                        'text-xl font-bold text-green-400' : 
+                        'text-xl font-bold text-red-400';
+                }
+                
+                if (slElement) {
+                    slElement.textContent = `${distanceSL}%`;
+                    slElement.className = distanceSL > 0 ? 
+                        'text-xl font-bold text-red-400' : 
+                        'text-xl font-bold text-green-400';
+                }
+                
+                // 更新进度条
+                if (progressElement) {
+                    const totalRange = Math.abs(tp1 - sl);
+                    const currentPosition = Math.abs(currentPrice - sl);
+                    const progress = (currentPosition / totalRange * 100);
+                    progressElement.style.width = `${Math.min(Math.max(progress, 0), 100)}%`;
+                }
+            }
+            
+            // 更新冷却时间显示
+            updateCooldownDisplay() {
+                if (!this.isInCooldown()) {
+                    const timeElement = document.getElementById('signalWaitTime');
+                    const progressElement = document.getElementById('waitProgress');
+                    const statusElement = document.getElementById('statusMessage');
+                    
+                    if (timeElement) timeElement.textContent = '就绪';
+                    if (progressElement) progressElement.style.width = '100%';
+                    if (statusElement) statusElement.textContent = '可以生成新信号！';
+                    return;
+                }
+                
+                const remaining = this.systemState.cooldownEnd - new Date();
+                const seconds = Math.floor(remaining / 1000);
+                const minutes = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                
+                const timeElement = document.getElementById('signalWaitTime');
+                const progressElement = document.getElementById('waitProgress');
+                const statusElement = document.getElementById('statusMessage');
+                
+                if (timeElement) {
+                    timeElement.textContent = `${minutes}:${secs.toString().padStart(2, '0')}`;
+                }
+                
+                if (progressElement) {
+                    const progress = ((this.TRADE_CONFIG.cooldownTime * 1000 - remaining) / (this.TRADE_CONFIG.cooldownTime * 1000) * 100);
+                    progressElement.style.width = `${progress}%`;
+                }
+                
+                if (statusElement) {
+                    statusElement.textContent = `等待新信号 (${minutes}:${secs.toString().padStart(2, '0')})`;
+                }
+                
+                // 每秒更新一次
+                if (remaining > 1000) {
+                    setTimeout(() => this.updateCooldownDisplay(), 1000);
+                }
+            }
+            
+            // 更新交易状态
+            updateTradeStatus(status, message) {
+                const statusElement = document.getElementById('tradeStatus');
+                const messageElement = document.getElementById('statusMessage');
+                
+                if (statusElement) {
+                    statusElement.textContent = status;
+                    statusElement.className = 'px-3 py-1 rounded-full';
+                    
+                    if (status === '进行中') {
+                        statusElement.classList.add('bg-yellow-900', 'text-yellow-300');
+                    } else if (status === '已完成') {
+                        statusElement.classList.add('bg-green-900', 'text-green-300');
+                    } else if (status === '观望') {
+                        statusElement.classList.add('bg-gray-700', 'text-gray-300');
+                    }
+                }
+                
+                if (messageElement) {
+                    messageElement.textContent = message;
+                }
+            }
+            
+            // 高亮交易结果
+            highlightTradeResult(result, tpLevel) {
+                const signalCard = document.getElementById('signalCard');
+                if (!signalCard) return;
+                
+                signalCard.classList.add('price-hit');
+                
+                if (result === 'win') {
+                    signalCard.style.borderColor = '#10b981';
+                    signalCard.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.5)';
+                } else {
+                    signalCard.style.borderColor = '#ef4444';
+                    signalCard.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.5)';
+                }
+                
+                // 3秒后移除高亮
+                setTimeout(() => {
+                    signalCard.classList.remove('price-hit');
+                    signalCard.style.boxShadow = '';
+                }, 3000);
+            }
+            
+            // 添加到历史
+            addToHistory(signal) {
+                this.systemState.signalHistory.unshift(signal);
+                
+                // 保持最多20条记录
+                if (this.systemState.signalHistory.length > 20) {
+                    this.systemState.signalHistory = this.systemState.signalHistory.slice(0, 20);
+                }
+                
+                // 更新显示
+                this.updateHistoryTable();
+                this.updateStatsDisplay();
+            }
+            
+            // 更新历史表格
+            updateHistoryTable() {
+                const tbody = document.getElementById('signalHistory');
+                if (!tbody) return;
+                
+                if (this.systemState.signalHistory.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="py-8 text-center text-gray-500">
+                                <i class="fas fa-chart-line text-3xl mb-2"></i>
+                                <div>等待第一个交易信号生成...</div>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                tbody.innerHTML = this.systemState.signalHistory.map(signal => {
+                    const time = new Date(signal.timestamp).toLocaleTimeString('zh-CN', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    
+                    const actionClass = signal.action === 'BUY' ? 'text-green-400' : 
+                                      signal.action === 'SELL' ? 'text-red-400' : 'text-gray-400';
+                    
+                    const actionIcon = signal.action === 'BUY' ? '📈' : 
+                                     signal.action === 'SELL' ? '📉' : '⏸️';
+                    
+                    let statusClass = 'text-gray-400';
+                    let statusText = '等待';
+                    
+                    if (signal.status === 'hit_tp1' || signal.status === 'hit_tp2') {
+                        statusClass = 'text-green-400';
+                        statusText = signal.status === 'hit_tp1' ? 'TP1达成' : 'TP2达成';
+                    } else if (signal.status === 'hit_sl') {
+                        statusClass = 'text-red-400';
+                        statusText = 'SL触发';
+                    } else if (signal.status === 'active') {
+                        statusClass = 'text-yellow-400';
+                        statusText = '进行中';
+                    }
+                    
+                    let resultClass = 'text-gray-400';
+                    let resultText = '-';
+                    
+                    if (signal.result === 'win') {
+                        resultClass = 'text-green-400 font-bold';
+                        resultText = `+$${signal.pnl || '0.00'}`;
+                    } else if (signal.result === 'loss') {
+                        resultClass = 'text-red-400';
+                        resultText = `-$${Math.abs(signal.pnl || '0').toFixed(2)}`;
+                    }
+                    
+                    return `
+                        <tr class="border-b border-gray-700 hover:bg-gray-700/30 transition-colors">
+                            <td class="py-3 px-2">${time}</td>
+                            <td class="py-3 px-2">
+                                <span class="${actionClass} font-bold">
+                                    ${actionIcon} ${signal.action}
+                                </span>
+                            </td>
+                            <td class="py-3 px-2">$${signal.price}</td>
+                            <td class="py-3 px-2">
+                                <div class="text-green-400 text-sm">TP1: $${signal.tp1}</div>
+                                <div class="text-green-300 text-sm">TP2: $${signal.tp2}</div>
+                                <div class="text-red-400 text-sm">SL: $${signal.sl}</div>
+                            </td>
+                            <td class="py-3 px-2">${signal.positionSize} USDT</td>
+                            <td class="py-3 px-2">
+                                <span class="${statusClass} text-sm">${statusText}</span>
+                            </td>
+                            <td class="py-3 px-2">
+                                <span class="${resultClass} font-semibold">${resultText}</span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+            
+            // 更新统计数据显示
+            updateStatsDisplay() {
+                const stats = this.systemState.stats;
+                const winRate = stats.totalTrades > 0 ? 
+                    ((stats.winningTrades / stats.totalTrades) * 100).toFixed(0) : 0;
+                
+                const totalTradesElement = document.getElementById('totalTrades');
+                const winRateElement = document.getElementById('winRate');
+                const totalPnLElement = document.getElementById('totalPnL');
+                
+                if (totalTradesElement) {
+                    totalTradesElement.textContent = stats.totalTrades;
+                }
+                
+                if (winRateElement) {
+                    winRateElement.textContent = `${winRate}%`;
+                    winRateElement.className = winRate >= 50 ? 
+                        'text-xl font-bold text-green-400' : 
+                        'text-xl font-bold text-red-400';
+                }
+                
+                if (totalPnLElement) {
+                    totalPnLElement.textContent = `$${stats.totalPnL.toFixed(2)}`;
+                    totalPnLElement.className = stats.totalPnL >= 0 ? 
+                        'text-xl font-bold text-green-400' : 
+                        'text-xl font-bold text-red-400';
+                }
+            }
+            
+            // 更新API调用次数显示
+            updateAPICallsDisplay() {
+                const apiCallsElement = document.getElementById('apiCalls');
+                if (apiCallsElement) {
+                    apiCallsElement.textContent = this.systemState.apiCallCount;
+                }
+            }
+            
+            // 更新所有显示
+            updateAllDisplays() {
+                this.updatePriceDisplay();
+                this.updateIndicatorsDisplay();
+                this.updateHistoryTable();
+                this.updateStatsDisplay();
+                this.updateCooldownDisplay();
+                this.updateAPICallsDisplay();
+                this.updateLastUpdateTime();
+                
+                // 如果有活跃交易，显示它
+                if (this.systemState.activeTrade) {
+                    this.displaySignal(this.systemState.activeTrade);
+                    this.updateTradeStatus('进行中', '交易执行中...');
+                } else if (this.systemState.lastSignal) {
+                    this.displaySignal(this.systemState.lastSignal);
+                }
+            }
+            
+            // 更新最后更新时间
+            updateLastUpdateTime() {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('zh-CN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                const element = document.getElementById('lastUpdate');
+                if (element) {
+                    element.textContent = timeString;
+                }
+            }
+            
+            // ==================== 图表相关方法 ====================
+            
+            // 初始化图表
+            initChart() {
+                const ctx = document.getElementById('priceChart');
+                if (!ctx) return;
+                
+                this.chart = new Chart(ctx.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'BTC/USDT',
+                            data: [],
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#d1d5db',
+                                    font: {
+                                        size: 14
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: '#9ca3af',
+                                    maxTicksLimit: 8
+                                },
+                                grid: {
+                                    color: '#374151'
+                                }
+                            },
+                            y: {
+                                ticks: {
+                                    color: '#9ca3af',
+                                    callback: function(value) {
+                                        return '$' + value.toLocaleString();
+                                    }
+                                },
+                                grid: {
+                                    color: '#374151'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // 更新图表
+            updateChart() {
+                if (!this.chart || this.chartData.length === 0) return;
+                
+                this.chart.data.labels = this.chartData.map(item => item.time);
+                this.chart.data.datasets[0].data = this.chartData.map(item => item.price);
+                this.chart.update();
+            }
+            
+            // ==================== 控制方法 ====================
+            
+            // 启动自动模式
+            startAutoMode() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                console.log('🚀 启动全自动模式');
+                
+                // 每10秒更新价格并检查交易
+                this.intervals.priceUpdate = setInterval(async () => {
+                    try {
+                        const price = await this.getCurrentPrice();
+                        if (price) {
+                            this.checkTradeConditions();
+                        }
+                    } catch (error) {
+                        console.error('价格更新失败:', error);
+                    }
+                }, 10000);
+                
+                // 每30秒检查是否生成新信号
+                this.intervals.signalCheck = setInterval(() => {
+                    this.generateSignal();
+                }, 30000);
+                
+                // 每60秒更新图表
+                this.intervals.chartUpdate = setInterval(async () => {
+                    try {
+                        const candles = await this.getCandleData('15m', 30);
+                        if (candles.length > 0) {
+                            this.processCandleData(candles);
+                        }
+                    } catch (error) {
+                        console.error('图表更新失败:', error);
+                    }
+                }, 60000);
+                
+                this.updateTradeStatus('运行中', '自动模式已启动');
+            }
+            
+            // 停止自动模式
+            stopAutoMode() {
+                if (!this.isRunning) return;
+                
+                this.isRunning = false;
+                console.log('🛑 停止自动模式');
+                
+                // 清除所有定时器
+                Object.values(this.intervals).forEach(interval => {
+                    if (interval) clearInterval(interval);
+                });
+                
+                this.updateTradeStatus('已停止', '自动模式已停止');
+            }
+            
+            // 开始冷却时间
+            startCooldownPeriod() {
+                this.systemState.cooldownEnd = new Date(Date.now() + this.TRADE_CONFIG.cooldownTime * 1000);
+                this.updateCooldownDisplay();
+            }
+            
+            // 检查是否在冷却期
+            isInCooldown() {
+                if (!this.systemState.cooldownEnd) return false;
+                return new Date() < this.systemState.cooldownEnd;
+            }
+            
+            // ==================== 数据存储方法 ====================
+            
+            // 加载系统状态
+            loadSystemState() {
+                try {
+                    // 加载信号历史
+                    const savedSignals = localStorage.getItem(this.STORAGE_KEYS.signals);
+                    if (savedSignals) {
+                        const parsed = JSON.parse(savedSignals);
+                        this.systemState.signalHistory = parsed.slice(0, 20);
+                    }
+                    
+                    // 加载系统状态
+                    const savedState = localStorage.getItem(this.STORAGE_KEYS.state);
+                    if (savedState) {
+                        const parsed = JSON.parse(savedState);
+                        
+                        // 合并状态，保留必要的默认值
+                        this.systemState = {
+                            ...this.systemState,
+                            ...parsed,
+                            stats: {
+                                ...this.systemState.stats,
+                                ...parsed.stats
+                            }
+                        };
+                        
+                        // 确保时间戳是Date对象
+                        if (this.systemState.cooldownEnd) {
+                            this.systemState.cooldownEnd = new Date(this.systemState.cooldownEnd);
+                        }
+                        
+                        if (this.systemState.activeTrade && this.systemState.activeTrade.status === 'active') {
+                            // 确保活跃交易的时间戳正确
+                            this.systemState.activeTrade.timestamp = new Date(this.systemState.activeTrade.timestamp);
+                        }
+                    }
+                    
+                    console.log('📊 系统状态加载完成:', {
+                        historyCount: this.systemState.signalHistory.length,
+                        activeTrade: !!this.systemState.activeTrade,
+                        stats: this.systemState.stats
+                    });
+                    
+                } catch (error) {
+                    console.error('加载系统状态失败:', error);
+                }
+            }
+            
+            // 保存系统状态
+            saveSystemState() {
+                try {
+                    localStorage.setItem(this.STORAGE_KEYS.signals, 
+                        JSON.stringify(this.systemState.signalHistory));
+                    
+                    localStorage.setItem(this.STORAGE_KEYS.state, 
+                        JSON.stringify({
+                            lastSignal: this.systemState.lastSignal,
+                            activeTrade: this.systemState.activeTrade,
+                            stats: this.systemState.stats,
+                            lastUpdate: new Date().toISOString(),
+                            cooldownEnd: this.systemState.cooldownEnd,
+                            isInitialized: this.systemState.isInitialized,
+                            apiCallCount: this.systemState.apiCallCount
+                        }));
+                        
+                    console.log('💾 系统状态已保存');
+                    
+                } catch (error) {
+                    console.error('保存系统状态失败:', error);
+                }
+            }
+            
+            // ==================== 公共方法 ====================
+            
+            // 手动生成信号
+            manualGenerateSignal() {
+                if (confirm('确定要手动生成信号吗？这可能会跳过冷却时间。')) {
+                    this.systemState.cooldownEnd = null;
+                    this.generateSignal();
+                }
+            }
+            
+            // 手动检查交易
+            manualCheckTrade() {
+                if (this.systemState.activeTrade) {
+                    this.checkTradeConditions();
+                    alert('已手动检查交易状态！');
+                } else {
+                    alert('当前没有活跃交易');
+                }
+            }
+            
+            // 重置系统
+            resetSystem() {
+                if (confirm('确定要重置系统吗？这将清除所有历史数据！')) {
+                    localStorage.removeItem(this.STORAGE_KEYS.signals);
+                    localStorage.removeItem(this.STORAGE_KEYS.state);
+                    
+                    // 重置状态
+                    this.systemState = {
+                        lastSignal: null,
+                        activeTrade: null,
+                        signalHistory: [],
+                        stats: {
+                            totalTrades: 0,
+                            winningTrades: 0,
+                            totalPnL: 0,
+                            currentStreak: 0,
+                            bestStreak: 0,
+                            maxWin: 0,
+                            maxLoss: 0,
+                            avgWin: 0,
+                            avgLoss: 0
+                        },
+                        indicators: {
+                            rsi: 50,
+                            trend: 'neutral',
+                            volatility: 0,
+                            support: 0,
+                            resistance: 0,
+                            pricePosition: 50
+                        },
+                        lastUpdate: null,
+                        cooldownEnd: null,
+                        isInitialized: false,
+                        apiCallCount: 0
+                    };
+                    
+                    this.priceData = [];
+                    this.chartData = [];
+                    this.currentPrice = 0;
+                    
+                    // 停止定时器
+                    this.stopAutoMode();
+                    
+                    // 更新显示
+                    this.updateAllDisplays();
+                    
+                    // 重新初始化
+                    setTimeout(() => {
+                        this.init();
+                    }, 1000);
+                    
+                    this.showSystemStatus('系统已重置', 'success');
+                    console.log('🔄 系统已重置');
+                }
+            }
+            
+            // 导出数据
+            exportData() {
+                if (this.systemState.signalHistory.length === 0) {
+                    alert('没有可导出的数据');
+                    return;
+                }
+                
+                const data = {
+                    signals: this.systemState.signalHistory,
+                    stats: this.systemState.stats,
+                    config: this.TRADE_CONFIG,
+                    exportTime: new Date().toISOString()
+                };
+                
+                const dataStr = JSON.stringify(data, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+                const fileName = `trading_data_${new Date().toISOString().slice(0, 10)}.json`;
+                
+                const link = document.createElement('a');
+                link.setAttribute('href', dataUri);
+                link.setAttribute('download', fileName);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                this.showSystemStatus(`已导出 ${this.systemState.signalHistory.length} 条记录`, 'success');
+            }
+            
+            // 刷新所有数据
+            async refreshAllData() {
+                try {
+                    this.showSystemStatus('刷新数据中...', 'loading');
+                    await this.loadInitialData();
+                    this.showSystemStatus('数据刷新完成', 'success');
+                } catch (error) {
+                    this.showSystemStatus('数据刷新失败', 'error');
+                }
+            }
+            
+            // 加载图表数据
+            async loadChartData() {
+                try {
+                    const timeframe = document.getElementById('timeframeSelect').value;
+                    const candles = await this.getCandleData(timeframe, 30);
+                    if (candles.length > 0) {
+                        this.processCandleData(candles);
+                        this.showSystemStatus('图表数据更新成功', 'success');
+                    }
+                } catch (error) {
+                    console.error('加载图表数据失败:', error);
+                    this.showSystemStatus('图表更新失败', 'error');
+                }
+            }
+        }
+
+        // ==================== 全局函数 ====================
+
+        // 创建全局实例
+        let tradingSystem = null;
+
+        // 初始化函数
+        function initTradingSystem() {
+            if (!tradingSystem) {
+                tradingSystem = new AutoTradingSystem();
+                tradingSystem.init();
+            }
+            return tradingSystem;
+        }
+
+        // 公共API函数
+        function manualCheckTP_SL() {
+            if (tradingSystem && tradingSystem.manualCheckTrade) {
+                tradingSystem.manualCheckTrade();
+            } else {
+                alert('系统未初始化');
+            }
+        }
+
+        function forceNewSignal() {
+            if (tradingSystem && tradingSystem.manualGenerateSignal) {
+                tradingSystem.manualGenerateSignal();
+            } else {
+                alert('系统未初始化');
+            }
+        }
+
+        function refreshAllData() {
+            if (tradingSystem && tradingSystem.refreshAllData) {
+                tradingSystem.refreshAllData();
+            } else {
+                alert('系统未初始化');
+            }
+        }
+
+        function resetSystem() {
+            if (tradingSystem && tradingSystem.resetSystem) {
+                tradingSystem.resetSystem();
+            } else {
+                if (confirm('系统未初始化，确定要重置吗？')) {
+                    localStorage.clear();
+                    location.reload();
+                }
+            }
+        }
+
+        function exportSignals() {
+            if (tradingSystem && tradingSystem.exportData) {
+                tradingSystem.exportData();
+            } else {
+                alert('系统未初始化');
+            }
+        }
+
+        function testAPIConnection() {
+            if (tradingSystem && tradingSystem.testAPIConnection) {
+                tradingSystem.testAPIConnection()
+                    .then(() => alert('✅ API连接正常'))
+                    .catch(() => alert('❌ API连接失败'));
+            } else {
+                alert('系统未初始化');
+            }
+        }
+
+        function startAutoMode() {
+            if (tradingSystem && tradingSystem.startAutoMode) {
+                tradingSystem.startAutoMode();
+                alert('自动模式已启动');
+            } else {
+                alert('系统未初始化');
+            }
+        }
+
+        function stopAutoMode() {
+            if (tradingSystem && tradingSystem.stopAutoMode) {
+                tradingSystem.stopAutoMode();
+                alert('自动模式已停止');
+            } else {
+                alert('系统未初始化');
+            }
+        }
+
+        function loadChartData() {
+            if (tradingSystem && tradingSystem.loadChartData) {
+                tradingSystem.loadChartData();
+            } else {
+                alert('系统未初始化');
+            }
+        }
+
+        function showAllSignals() {
+            if (tradingSystem) {
+                tradingSystem.updateHistoryTable();
+                alert('显示所有信号记录');
+            }
+        }
+
+        function showOnlyProfitable() {
+            if (tradingSystem && tradingSystem.systemState.signalHistory) {
+                const profitable = tradingSystem.systemState.signalHistory.filter(s => s.result === 'win');
+                alert(`显示 ${profitable.length} 个盈利信号`);
+            }
+        }
+
+        function clearHistory() {
+            if (confirm('确定要清空所有历史记录吗？此操作不可撤销！')) {
+                localStorage.removeItem('auto_trading_signals_v2');
+                if (tradingSystem) {
+                    tradingSystem.systemState.signalHistory = [];
+                    tradingSystem.updateHistoryTable();
+                    tradingSystem.updateStatsDisplay();
+                }
+                alert('历史记录已清空');
+            }
+        }
+
+        function showSettings() {
+            const settings = `
+当前设置:
+• 交易对: BTC-USDT
+• 账户本金: 100 USDT
+• 单笔风险: 2%
+• TP1: +1.5% (微利)
+• TP2: +3% (中利)
+• SL: -1.2% (小损)
+• 冷却时间: 3分钟
+• RSI超卖: <28
+• RSI超买: >72
+• 数据源: OKX交易所
+• 版本: v2.1
+            `;
+            alert(settings);
+        }
+
+        // ==================== 页面加载初始化 ====================
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📈 BTC/USDT 自动交易系统加载中...');
+            console.log('🕒 启动时间:', new Date().toLocaleString('zh-CN'));
+            
+            // 显示启动信息
+            const welcomeMsg = `
+╔═══════════════════════════════════════════╗
+║   🚀 BTC/USDT 自动交易系统 v2.1           ║
+║                                            ║
+║   系统特性:                               ║
+║   • 全自动运行，无需人工干预              ║
+║   • 所有访问者信号一致                    ║
+║   • 智能分析，详细信号原因                ║
+║   • 优化风险控制 (SL:1.2%, TP:1.5%/3%)   ║
+║   • 自动检测TP/SL，完成才给新信号         ║
+║                                            ║
+║   数据源: OKX交易所 API                   ║
+║   时间框架: 15分钟                         ║
+╚═══════════════════════════════════════════╝
+            `;
+            console.log(welcomeMsg);
+            
+            // 初始化系统
+            tradingSystem = initTradingSystem();
+            
+            // 暴露到全局
+            window.tradingSystem = tradingSystem;
+            
+            // 添加错误处理
+            window.addEventListener('error', function(event) {
+                console.error('全局错误:', event.error);
+                const statusElement = document.getElementById('systemStatus');
+                if (statusElement) {
+                    statusElement.textContent = '❌ 系统错误，请刷新页面';
+                    statusElement.className = 'text-red-400';
+                }
+            });
+            
+            // 页面可见性变化处理
+            document.addEventListener('visibilitychange', function() {
+                if (tradingSystem && tradingSystem.isRunning) {
+                    if (document.hidden) {
+                        console.log('页面隐藏，暂停部分更新');
+                    } else {
+                        console.log('页面显示，恢复正常更新');
+                        tradingSystem.loadInitialData().catch(console.error);
+                    }
+                }
+            });
+            
+            // 初始化最后更新时间显示
+            function updateLastUpdateTime() {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('zh-CN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                const element = document.getElementById('lastUpdate');
+                if (element) {
+                    element.textContent = timeString;
+                }
+            }
+            
+            // 每10秒更新时间
+            setInterval(updateLastUpdateTime, 10000);
+            updateLastUpdateTime();
+        });
+
+        console.log('✅ JavaScript代码加载完成');
+    </script>
+</body>
+</html>
